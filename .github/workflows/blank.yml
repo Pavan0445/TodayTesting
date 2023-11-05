@@ -1,29 +1,30 @@
-#For the provider URL: Use https://token.actions.githubusercontent.com
-#For the "Audience": Use sts.amazonaws.com 
-name: AWS OIDC Connect Demo
+name: Deploy EC2 with Terraform
+
 on:
-  push
-env:
-  AWS_REGION : "us-east-1"   
-permissions:
-      id-token: write   # This is required for requesting the JWT
-      contents: read    # This is required for actions/checkout
+  push:
+    branches:
+      - main  # Replace with the branch you want to trigger the deployment on
+
 jobs:
-  DemoOIDC:
-    runs-on: demo
+  deploy:
+    runs-on: ubuntu-latest
+
     steps:
-      - name: Git clone the repository
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-      - name: configure aws credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          role-to-assume: arn:aws:iam::600764632321:role/MyPipelineRole
-          role-session-name: samplerolesession
-          aws-region: ${{ env.AWS_REGION }}
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v1
 
-      - name: Print AWS SSM Parameter
-        run: aws ssm get-parameter --name=hello_aws-gh-oidc --query Parameter.Value
+    - name: Terraform Init
+      run: terraform init
 
-      - name: Print assumed role
-        run: aws sts get-caller-identity
+    - name: Terraform Plan
+      run: terraform plan
+
+    - name: Terraform Apply
+      run: terraform apply -auto-approve
+
+    - name: Clean up
+      run: terraform destroy -auto-approve
+
