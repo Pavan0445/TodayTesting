@@ -1,12 +1,11 @@
-name: Deploy Resources with Terraform
+name: Get AWS Session Token
 
 on:
-  push:
-    branches:
-      - main  # Replace with the branch you want to trigger the deployment on
+  workflow_dispatch:
+  # Add other events or triggers as needed
 
 jobs:
-  deploy:
+  get-session-token:
     runs-on: ubuntu-latest
 
     steps:
@@ -14,20 +13,25 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Set up AWS CLI
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      run: |
+        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws configure set region us-east-1  # Change to your desired AWS region
+
+    - name: Get AWS Session Token
+      run: |
+        # Replace ROLE_ARN with the ARN of the IAM role you want to assume
+        role_arn=arn:aws:iam::600764632321:role/MyPipelineTrustPolicyRole
+        session_name="GitHubActionsSession"
         
-        aws-region: us-east-1  # Change this to your desired AWS region
+        sts_response=$(aws sts assume-role --role-arn $role_arn --role-session-name $session_name)
 
-    - name: Run Terraform
-      run: |
-        cd path/to/your/terraform/directory  # Change to the directory where your Terraform configuration files are located
-        terraform init
-        terraform apply -auto-approve
+        access_key=$(echo $sts_response | jq -r .Credentials.AccessKeyId)
+        secret_key=$(echo $sts_response | jq -r .Credentials.SecretAccessKey)
+        session_token=$(echo $sts_response | jq -r .Credentials.SessionToken)
 
-    - name: Cleanup
-      run: |
-        cd path/to/your/terraform/directory
-        terraform destroy -auto-approve
+        echo "::set-secret name=AWS_SESSION_TOKEN::$session_token"
+        echo "::set-secret name=AWS_ACCESS_KEY_ID::$access_key"
+        echo "::set-secret name=AWS_SECRET_ACCESS_KEY::$secret_key"
+      env:
+        AWS_DEFAULT_REGION: us-east-1  # Change to your desired AWS region
